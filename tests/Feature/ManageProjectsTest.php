@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
-class ProjectsTest extends TestCase
+class ManageProjectsTest extends TestCase
 {
 
     use WithFaker, RefreshDatabase;
@@ -25,6 +25,8 @@ class ProjectsTest extends TestCase
 
         $this->actingAs($user);
 
+        $this->get('/projects/create')->assertStatus(200);
+
         $attributes = [
             'title' => $this->faker->sentence(),
             'description' => $this->faker->paragraph()
@@ -37,7 +39,17 @@ class ProjectsTest extends TestCase
         $this->get("/projects")->assertSee($attributes['title']);
     }
 
-    public function test_a_user_can_view_a_project()
+    public function test_guests_cannot_manage_projects()
+    {
+        $project = Project::factory()->create();
+
+        $this->get('/projects')->assertRedirect('login');
+        $this->post('/projects', $project->toArray())->assertRedirect('login');
+        $this->get('/projects/create')->assertRedirect('login');
+        $this->get($project->path())->assertRedirect('login');
+    }
+
+    public function test_a_user_can_view_their_project()
     {
         $this->withoutExceptionHandling();
 
@@ -45,13 +57,22 @@ class ProjectsTest extends TestCase
 
         $this->actingAs($user);
 
-        $project = Project::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
 
         $this->get($project->path())
              ->assertSeeText($project->title);
 
         // $this->get("projects/{$project->id}")
         //      ->assertSeeText($project->description);
+    }
+
+    public function test_an_authenticated_user_cannot_view_the_projects_of_others()
+    {
+        $this->be(User::factory()->create());
+
+        $project = Project::factory()->create();
+
+        $this->get($project->path())->assertStatus(403);
     }
 
     public function test_a_project_requires_a_title()
@@ -77,12 +98,24 @@ class ProjectsTest extends TestCase
         $this->post('/projects', $attributes)->assertSessionHasErrors('description');
     }
 
-    public function test_only_authenticated_users_can_create_projects()
+    public function test_guests_cannot_create_projects()
     {
         // $this->withoutExceptionHandling();
         
         $attributes = Project::factory()->raw();
 
         $this->post('/projects', $attributes)->assertRedirect('login');
+    }
+
+    public function test_guests_cannot_view_projects()
+    {
+        $this->get('/projects')->assertRedirect('login');
+    }
+
+    public function test_guests_cannot_view_a_single_project()
+    {
+        $project = Project::factory()->create();
+
+        $this->get($project->path())->assertRedirect('login');
     }
 }

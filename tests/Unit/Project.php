@@ -20,4 +20,9 @@ class Project extends TestCase
 
         $this->assertEquals("/projects/{$project->id}", $project->path());
     }
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
